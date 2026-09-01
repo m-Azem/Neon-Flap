@@ -3,67 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Flap - Time Killer</title>
+    <title>Neon Flap</title>
+    
+    <!-- PWA MANIFEST LINK (This is what tells the browser to install it!) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#111111">
+    
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #111;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            font-family: 'Courier New', Courier, monospace;
-            touch-action: none; /* Prevents mobile scrolling/zooming */
-            user-select: none;
-        }
-
-        #game-container {
-            position: relative;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
-            border-radius: 5px;
-            overflow: hidden;
-        }
-
-        canvas {
-            display: block;
-            background-color: #1a1a2e;
-        }
-
-        #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            pointer-events: none; /* Let clicks pass through to canvas */
-        }
-
-        h1 {
-            color: #0f0;
-            text-shadow: 0 0 10px #0f0;
-            font-size: 2.5rem;
-            margin: 0;
-            text-align: center;
-            text-transform: uppercase;
-        }
-
-        p {
-            color: #fff;
-            font-size: 1.2rem;
-            margin-top: 10px;
-            text-shadow: 0 0 5px #fff;
-            text-align: center;
-        }
-
-        .hidden {
-            display: none !important;
-        }
+        body { margin: 0; padding: 0; background-color: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', Courier, monospace; touch-action: none; user-select: none; }
+        #game-container { position: relative; box-shadow: 0 0 30px rgba(0, 255, 255, 0.2); border-radius: 5px; overflow: hidden; }
+        canvas { display: block; background-color: #1a1a2e; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: none; }
+        h1 { color: #0f0; text-shadow: 0 0 10px #0f0; font-size: 2.5rem; margin: 0; text-align: center; text-transform: uppercase; }
+        p { color: #fff; font-size: 1.2rem; margin-top: 10px; text-shadow: 0 0 5px #fff; text-align: center; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -77,53 +30,49 @@
     </div>
 
     <script>
+        // --- SERVICE WORKER REGISTRATION (Required for offline play & install) ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker failed', err));
+            });
+        }
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const uiLayer = document.getElementById('ui-layer');
         const title = document.getElementById('title');
         const subtitle = document.getElementById('subtitle');
 
-        // Virtual game resolution (keeps physics consistent on all devices)
         const GAME_WIDTH = 400;
         const GAME_HEIGHT = 600;
-
         let scale = 1;
 
-        // Game State
-        let state = 'START'; // START, PLAYING, GAMEOVER
+        let state = 'START'; 
         let score = 0;
         let highscore = localStorage.getItem('neonFlapHighscore') || 0;
         let frames = 0;
 
-        // Entities
-        const bird = {
-            x: 80, y: 300, w: 20, h: 20,
-            velocity: 0, gravity: 0.45, jump: -7,
-            trail: []
-        };
-
+        const bird = { x: 80, y: 300, w: 20, h: 20, velocity: 0, gravity: 0.45, jump: -7, trail: [] };
         let pipes = [];
         const pipeWidth = 60;
         const pipeGap = 160;
         const pipeSpeed = 3.5;
 
-        // Window resize handling for responsive scaling
         function resize() {
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
-            
-            // Calculate scale to fit screen while maintaining aspect ratio
             scale = Math.min(screenWidth / GAME_WIDTH, screenHeight / GAME_HEIGHT) * 0.95;
-            
             canvas.width = GAME_WIDTH * scale;
             canvas.height = GAME_HEIGHT * scale;
         }
         window.addEventListener('resize', resize);
         resize();
 
-        // Input Handling
+        // --- UPDATED INPUT HANDLING (Fixed for PC mouse & Touch) ---
         function triggerAction(e) {
-            if (e.type !== 'pointerdown' && e.code !== 'Space') return;
+            if (e.type === 'keydown' && e.code !== 'Space') return;
             
             if (state === 'START') {
                 state = 'PLAYING';
@@ -139,104 +88,57 @@
             }
         }
 
-        window.addEventListener('pointerdown', triggerAction);
+        window.addEventListener('mousedown', triggerAction);
+        window.addEventListener('touchstart', triggerAction);
         window.addEventListener('keydown', triggerAction);
 
         function resetGame() {
-            bird.y = GAME_HEIGHT / 2;
-            bird.velocity = 0;
-            bird.trail = [];
-            pipes = [];
-            score = 0;
-            frames = 0;
+            bird.y = GAME_HEIGHT / 2; bird.velocity = 0; bird.trail = []; pipes = []; score = 0; frames = 0;
         }
 
-        // Game Loop
         function update() {
             if (state === 'PLAYING') {
-                // Bird physics
-                bird.velocity += bird.gravity;
-                bird.y += bird.velocity;
-
-                // Bird Trail
+                bird.velocity += bird.gravity; bird.y += bird.velocity;
                 bird.trail.push({ x: bird.x, y: bird.y });
                 if (bird.trail.length > 10) bird.trail.shift();
 
-                // Pipe generation
                 if (frames % 90 === 0) {
-                    const minPipeHeight = 50;
-                    const maxPipeHeight = GAME_HEIGHT - pipeGap - minPipeHeight;
+                    const minPipeHeight = 50; const maxPipeHeight = GAME_HEIGHT - pipeGap - minPipeHeight;
                     const topHeight = Math.floor(Math.random() * (maxPipeHeight - minPipeHeight + 1)) + minPipeHeight;
-                    
-                    pipes.push({
-                        x: GAME_WIDTH,
-                        topHeight: topHeight,
-                        passed: false
-                    });
+                    pipes.push({ x: GAME_WIDTH, topHeight: topHeight, passed: false });
                 }
 
-                // Pipe logic
                 for (let i = pipes.length - 1; i >= 0; i--) {
-                    let p = pipes[i];
-                    p.x -= pipeSpeed;
-
-                    // Collision Detection
+                    let p = pipes[i]; p.x -= pipeSpeed;
                     const hitTop = bird.x < p.x + pipeWidth && bird.x + bird.w > p.x && bird.y < p.topHeight;
                     const hitBottom = bird.x < p.x + pipeWidth && bird.x + bird.w > p.x && bird.y + bird.h > p.topHeight + pipeGap;
-                    
                     if (hitTop || hitBottom) gameOver();
-
-                    // Scoring
-                    if (p.x + pipeWidth < bird.x && !p.passed) {
-                        score++;
-                        p.passed = true;
-                    }
-
-                    // Remove off-screen pipes
-                    if (p.x + pipeWidth < 0) {
-                        pipes.splice(i, 1);
-                    }
+                    if (p.x + pipeWidth < bird.x && !p.passed) { score++; p.passed = true; }
+                    if (p.x + pipeWidth < 0) { pipes.splice(i, 1); }
                 }
-
-                // Floor / Ceiling collision
-                if (bird.y + bird.h >= GAME_HEIGHT || bird.y <= 0) {
-                    gameOver();
-                }
-
+                if (bird.y + bird.h >= GAME_HEIGHT || bird.y <= 0) gameOver();
                 frames++;
             }
         }
 
         function gameOver() {
             state = 'GAMEOVER';
-            if (score > highscore) {
-                highscore = score;
-                localStorage.setItem('neonFlapHighscore', highscore);
-            }
+            if (score > highscore) { highscore = score; localStorage.setItem('neonFlapHighscore', highscore); }
             title.innerText = 'CRASHED';
             subtitle.innerHTML = `Score: ${score}<br>Highscore: ${highscore}<br><br>Tap to continue`;
             uiLayer.classList.remove('hidden');
         }
 
         function draw() {
-            // Apply scale
             ctx.setTransform(scale, 0, 0, scale, 0, 0);
-
-            // Clear Background
             ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-            // Draw Pipes
-            ctx.fillStyle = '#ff0055';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#ff0055';
+            ctx.fillStyle = '#ff0055'; ctx.shadowBlur = 15; ctx.shadowColor = '#ff0055';
             pipes.forEach(p => {
-                // Top pipe
                 ctx.fillRect(p.x, 0, pipeWidth, p.topHeight);
-                // Bottom pipe
                 ctx.fillRect(p.x, p.topHeight + pipeGap, pipeWidth, GAME_HEIGHT - p.topHeight - pipeGap);
             });
 
-            // Draw Bird Trail
             if (state === 'PLAYING' || state === 'GAMEOVER') {
                 ctx.shadowBlur = 0;
                 bird.trail.forEach((pos, index) => {
@@ -246,51 +148,31 @@
                 });
             }
 
-            // Draw Bird
-            ctx.fillStyle = '#00ffff';
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#00ffff';
+            ctx.fillStyle = '#00ffff'; ctx.shadowBlur = 20; ctx.shadowColor = '#00ffff';
             ctx.fillRect(bird.x, bird.y, bird.w, bird.h);
 
-            // Draw Score
             if (state === 'PLAYING') {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.shadowBlur = 5;
-                ctx.shadowColor = '#fff';
-                ctx.font = 'bold 40px Arial';
-                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.shadowBlur = 5; ctx.shadowColor = '#fff';
+                ctx.font = 'bold 40px Arial'; ctx.textAlign = 'center';
                 ctx.fillText(score, GAME_WIDTH / 2, 60);
             }
-
-            // Reset transform & shadow before next frame
-            ctx.shadowBlur = 0;
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.shadowBlur = 0; ctx.setTransform(1, 0, 0, 1, 0, 0);
         }
 
-// --- Updated Game Loop (Fixed at 60 FPS) ---
+        // --- 60 FPS THROTTLE FIX ---
         let lastTime = performance.now();
-        const frameInterval = 1000 / 60; // 1000 milliseconds divided by 60 frames
+        const frameInterval = 1000 / 60;
 
         function loop(currentTime) {
-            // Request the next frame immediately
             requestAnimationFrame(loop);
-            
-            // Calculate how much time has passed
             const deltaTime = currentTime - lastTime;
-            
-            // Only update and draw IF enough time has passed (16.67 milliseconds)
             if (deltaTime >= frameInterval) {
-                // Adjust the timer, accounting for tiny variations
                 lastTime = currentTime - (deltaTime % frameInterval);
-                
                 update();
                 draw();
             }
         }
-
-        // Start engine
         requestAnimationFrame(loop);
     </script>
 </body>
 </html>
-
