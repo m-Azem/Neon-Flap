@@ -267,10 +267,25 @@
             ctx.setTransform(1, 0, 0, 1, 0, 0);
         }
 
-        function loop() {
-            update();
-            draw();
+// --- Updated Game Loop (Fixed at 60 FPS) ---
+        let lastTime = performance.now();
+        const frameInterval = 1000 / 60; // 1000 milliseconds divided by 60 frames
+
+        function loop(currentTime) {
+            // Request the next frame immediately
             requestAnimationFrame(loop);
+            
+            // Calculate how much time has passed
+            const deltaTime = currentTime - lastTime;
+            
+            // Only update and draw IF enough time has passed (16.67 milliseconds)
+            if (deltaTime >= frameInterval) {
+                // Adjust the timer, accounting for tiny variations
+                lastTime = currentTime - (deltaTime % frameInterval);
+                
+                update();
+                draw();
+            }
         }
 
         // Start engine
