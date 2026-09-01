@@ -57,13 +57,31 @@
         }
         window.addEventListener('resize', resize); resize();
 
+        // --- Updated Input Handling ---
         function triggerAction(e) {
-            if (e.type !== 'pointerdown' && e.code !== 'Space') return;
-            if (state === 'START') { state = 'PLAYING'; uiLayer.classList.add('hidden'); resetGame(); } 
-            else if (state === 'PLAYING') { bird.velocity = bird.jump; } 
-            else if (state === 'GAMEOVER') { state = 'START'; title.innerText = 'Neon Flap'; subtitle.innerHTML = `Highscore: ${highscore}<br><br>Tap to play again`; uiLayer.classList.remove('hidden'); }
+            // If it's a keyboard event, only allow the Spacebar
+            if (e.type === 'keydown' && e.code !== 'Space') return;
+            
+            if (state === 'START') {
+                state = 'PLAYING';
+                uiLayer.classList.add('hidden');
+                resetGame();
+            } else if (state === 'PLAYING') {
+                bird.velocity = bird.jump;
+            } else if (state === 'GAMEOVER') {
+                state = 'START';
+                title.innerText = 'Neon Flap';
+                subtitle.innerHTML = `Highscore: ${highscore}<br><br>Click or Tap to play again`;
+                uiLayer.classList.remove('hidden');
+            }
         }
-        window.addEventListener('pointerdown', triggerAction); window.addEventListener('keydown', triggerAction);
+
+        // Listen for mouse clicks, touch screens, and keyboard separately to ensure 100% compatibility
+        window.addEventListener('mousedown', triggerAction);
+        window.addEventListener('touchstart', triggerAction);
+        window.addEventListener('keydown', triggerAction);
+        
+        // ------------------------------
 
         function resetGame() { bird.y = GAME_HEIGHT / 2; bird.velocity = 0; bird.trail = []; pipes = []; score = 0; frames = 0; }
 
